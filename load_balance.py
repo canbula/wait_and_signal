@@ -2,12 +2,8 @@ import random
 import time
 from threading import Thread, Condition
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
 import matplotlib
-import numpy as np
-
-
-matplotlib.use("TkAgg")
 
 
 class JobsAndUsers:
@@ -18,18 +14,21 @@ class JobsAndUsers:
         self.resources = [Condition() for _ in range(number_of_resources)]
         self.jobs = [job_size for _ in range(number_of_users)]
         self.queue = [0 for _ in range(number_of_resources)]
+        matplotlib.use("TkAgg")
+        plt.rcParams["figure.figsize"] = [8, 6]
+        self.fig, self.axs = plt.subplots(1, 2, tight_layout=True)
 
     def user(self, i):
         print("Hi, I am user #%d" % i)
         while self.jobs[i] > 0:
-            time.sleep(3 + random.random())
+            time.sleep(random.random())
             print("User #%d wants to start now" % i)
             r = self.queue.index(min(self.queue))
             self.queue[r] += 1
             print("User #%d is trying to get the resource #%d" % (i, r))
             if self.resources[r].acquire():
                 print("User #%d has the resource #%d" % (i, r))
-                time.sleep(5 + random.random())
+                time.sleep(random.random())
                 self.jobs[i] -= 1
                 self.queue[r] -= 1
                 self.resources[r].notify()
@@ -38,37 +37,40 @@ class JobsAndUsers:
             else:
                 print("User #%d could not get the resource #%d" % (i, r))
 
+    def axes_properties(self):
+        self.axs[0].clear()
+        self.axs[1].clear()
+        self.axs[0].set_ylim([0, self.n])
+        self.axs[1].set_ylim([0, self.m])
+        self.axs[0].set_title("Resources")
+        self.axs[1].set_title("Jobs")
 
-def prepare_animation(bar_container):
+    def init(self):
+        self.axes_properties()
+        self.axs[0].bar([i for i in range(self.r)], self.queue)
+        self.axs[1].bar([i for i in range(self.n)], self.jobs)
 
-    def animate(frame_number):
-        # simulate new data coming in
-        data = np.random.randn(1000)
-        n, _ = np.histogram(data, np.linspace(-4, 4, 100))
-        for count, rect in zip(n, bar_container.patches):
-            rect.set_height(count)
-        return bar_container.patches
-    return animate
+    def update(self, _):
+        self.axes_properties()
+        self.axs[0].bar([i for i in range(self.r)], self.queue)
+        self.axs[1].bar([i for i in range(self.n)], self.jobs)
+        if sum(self.jobs) == 0:
+            quit()
+
+    def draw(self):
+        _ = FuncAnimation(self.fig, self.update, init_func=self.init, save_count=10)
+        plt.show()
 
 
 def main():
-    n = 10
-    r = 3
+    n = 50
+    r = 5
     m = 100
     jobs_and_users = JobsAndUsers(n, r, m)
     users = [Thread(target=jobs_and_users.user, args=(i,)) for i in range(n)]
     for user in users:
         user.start()
-    HIST_BINS = np.linspace(-4, 4, 100)
-    data = np.random.randn(1000)
-    n, _ = np.histogram(data, HIST_BINS)
-    fig, ax = plt.subplots()
-    _, _, bar_container = ax.hist(data, HIST_BINS, lw=1,
-                                  ec="yellow", fc="green", alpha=0.5)
-    ax.set_ylim(top=55)
-    ani = animation.FuncAnimation(fig, prepare_animation(bar_container), 50,
-                                  repeat=False, blit=True)
-    plt.show()
+    jobs_and_users.draw()
     for user in users:
         user.join()
 
